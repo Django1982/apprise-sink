@@ -1,0 +1,30 @@
+name: Publish to Plugin Marketplace
+
+# Publishing a GitHub release tagged v<version> (the version in module.yaml) hands the commit to the
+# marketplace's builder (verified build). A pre-release goes to the beta channel. A person at Prusa
+# reviews every release before operators can install it.
+# Run it by hand with "dry_run" on to build, check and sign with a throwaway key and upload nothing.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build, check and sign, but upload nothing
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    uses: prusa3d/prusa-connect-marketplace-publish/.github/workflows/publish.yml@448af8c91938825d28df9d28cbd253022ecaaea7 # v1.0.1
+    with:
+      path: .
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    # The environment `release` holds PRUSA_CONNECT_EXTENSION_SIGNING_KEY. Pass it by name:
+    # `secrets: inherit` does not reach a workflow in another organisation.
+    secrets:
+      PRUSA_CONNECT_EXTENSION_SIGNING_KEY: ${{ secrets.PRUSA_CONNECT_EXTENSION_SIGNING_KEY }}
+    permissions:
+      contents: read
+      id-token: write     # lets the run prove which repository, workflow and builder it is
+      attestations: write # the build provenance of the archive and every binary
