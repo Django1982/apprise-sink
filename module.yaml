@@ -1,0 +1,68 @@
+# apprise-sink: a Connect Local service module that reports print events to an Apprise server.
+# The manifest names no namespace; the host derives it from the module path (github.com/django1982/apprise-sink).
+name: apprise-sink
+title: Apprise notifications
+summary: Sends Connect Local print events to an Apprise server.
+kind: sink
+version: 0.4.2
+license: MIT
+contract_major: 1
+
+# Reads the events as itself. With -approve the install writes the grant org:local#viewer@sink:apprise-sink.
+permissions:
+  - observe
+
+# The printer's name comes from the server (device.get), no token needed.
+require:
+  core-device.get: "*"
+
+# Its own data directory holds the cursor (the position in the event stream).
+needs:
+  data: true
+
+# The only place this module sends to is the Apprise address the operator sets in apprise_url.
+egress:
+  - option: apprise_url
+    why: Sends print notifications to the Apprise server the operator names.
+    sends: Printer name, file name, result, duration, filament used and end time of a print.
+
+options:
+  - key: apprise_url
+    type: string
+    default: ""
+    summary: Full address of the Apprise notify endpoint, for example http://apprise:8000/notify/KEY.
+  - key: apprise_user
+    type: string
+    default: ""
+    summary: User name for HTTP basic authentication, empty for none.
+  - key: apprise_password
+    type: secret
+    default: ""
+    summary: Password for HTTP basic authentication.
+  - key: apprise_tag
+    type: string
+    default: ""
+    summary: Apprise tag that selects the targets (comma means or, space means and). Empty sends to all.
+  - key: device_names
+    type: object
+    default: "{}"
+    summary: Fallback names from device id to name, used only when the server cannot tell a name.
+  - key: events
+    type: list
+    default: '["job_started","job_settled"]'
+    summary: "Which events to report. Choose from job_started, job_settled, printer_online, printer_offline, printer_issues, new_printer and upload_failed."
+  - key: job_outcomes
+    type: list
+    default: '["finished","failed","cancelled","unknown"]'
+    summary: "Which print results to report when job_settled is on: finished, failed, cancelled, unknown."
+  - key: debug
+    type: bool
+    default: "false"
+    summary: Write a detailed log file (events received, filter decisions, send attempts) to the module's data directory. Turning it off deletes the file. No credentials are written.
+  - key: dry_run
+    type: bool
+    default: "true"
+    summary: Only log what would be sent and send nothing.
+
+platforms:
+  - linux_amd64
