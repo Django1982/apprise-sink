@@ -23,7 +23,7 @@ import (
 
 const (
 	name    = "apprise-sink"
-	release = "0.4.2"
+	release = "0.5.0"
 
 	subWindow  = 1 << 16
 	cursorFile = "cursor"
@@ -96,7 +96,11 @@ type settings struct {
 	Debug       flexBool `json:"debug"`
 	Events      flexList `json:"events"`
 	Outcomes    flexList `json:"job_outcomes"`
+	Language    string   `json:"language"`
 }
+
+// lang ist die Sprache der Nachrichten (en oder de); Vorgabe Englisch.
+func (s *settings) lang() string { return normLang(s.Language) }
 
 type app struct {
 	ch       *channel
@@ -174,7 +178,7 @@ func (a *app) call(ctx context.Context, method string, params any) (json.RawMess
 
 // resolveName fragt den Server nach dem Namen des Druckers: erst ein vom Nutzer vergebener Gerätename,
 // dann der Hostname, den der Drucker selbst meldet, zuletzt die Einstellung device_names.
-func (a *app) resolveName(ctx context.Context, id string, fallback map[string]string) string {
+func (a *app) resolveName(ctx context.Context, id string, fallback map[string]string, lang string) string {
 	res, err := a.call(ctx, "device.get", map[string]string{"id": id})
 	if err == nil {
 		var d struct {
@@ -198,7 +202,7 @@ func (a *app) resolveName(ctx context.Context, id string, fallback map[string]st
 	} else {
 		logf("device.get: %v", err)
 	}
-	return deviceName(fallback, id)
+	return deviceName(fallback, id, lang)
 }
 
 // Der Cursor liegt als Datei im Datenverzeichnis, das der Host dem Modul gibt (needs: data).
@@ -444,7 +448,7 @@ func (a *app) window(ctx context.Context, line []byte) {
 		}
 		dev := ""
 		if sp.device {
-			dev = a.resolveName(ctx, strings.TrimPrefix(env.Subject, "device:"), cfg.DeviceNames)
+			dev = a.resolveName(ctx, strings.TrimPrefix(env.Subject, "device:"), cfg.DeviceNames, cfg.lang())
 		}
 		n, ok := sp.build(env.Data, dev, cfg, a)
 		if !ok {

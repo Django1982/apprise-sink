@@ -18,8 +18,8 @@ type spec struct {
 
 var specs = []spec{
 	{key: "job_started", typ: "com.prusa.connect.device.job.started", device: true, job: true,
-		build: func(d json.RawMessage, dev string, _ *settings, _ *app) (note, bool) {
-			return build("com.prusa.connect.device.job.started", d, dev)
+		build: func(d json.RawMessage, dev string, cfg *settings, _ *app) (note, bool) {
+			return build("com.prusa.connect.device.job.started", d, dev, cfg.lang())
 		}},
 	{key: "job_settled", typ: "com.prusa.connect.device.job.settled", device: true, job: true,
 		build: func(d json.RawMessage, dev string, cfg *settings, _ *app) (note, bool) {
@@ -34,24 +34,25 @@ var specs = []spec{
 			if !contains(cfg.Outcomes, o) {
 				return note{}, false
 			}
-			return build("com.prusa.connect.device.job.settled", d, dev)
+			return build("com.prusa.connect.device.job.settled", d, dev, cfg.lang())
 		}},
 	{key: "printer_online", typ: "com.prusa.connect.device.arrived", device: true, raw: true,
-		build: func(_ json.RawMessage, dev string, _ *settings, _ *app) (note, bool) {
-			return note{title: "🟢 " + dev + ": verbunden", kind: "info"}, true
+		build: func(_ json.RawMessage, dev string, cfg *settings, _ *app) (note, bool) {
+			return note{title: "🟢 " + dev + ": " + tr(cfg.lang(), "online"), kind: "info"}, true
 		}},
 	{key: "printer_offline", typ: "com.prusa.connect.device.departed", device: true, raw: true,
-		build: func(d json.RawMessage, dev string, _ *settings, _ *app) (note, bool) {
+		build: func(d json.RawMessage, dev string, cfg *settings, _ *app) (note, bool) {
 			var x struct {
 				Reason string `json:"reason"`
 			}
 			_ = json.Unmarshal(d, &x)
-			return note{title: "🔴 " + dev + ": getrennt", body: x.Reason, kind: "warning"}, true
+			return note{title: "🔴 " + dev + ": " + tr(cfg.lang(), "offline"), body: x.Reason, kind: "warning"}, true
 		}},
 	{key: "printer_issues", typ: "com.prusa.connect.device.issues.changed", device: true, raw: true,
 		build: buildIssues},
 	{key: "new_printer", typ: "com.prusa.connect.device.registration.announced",
-		build: func(d json.RawMessage, _ string, _ *settings, _ *app) (note, bool) {
+		build: func(d json.RawMessage, _ string, cfg *settings, _ *app) (note, bool) {
+			lang := cfg.lang()
 			var r struct {
 				Code, Model, Serial, Firmware string
 			}
@@ -62,15 +63,16 @@ var specs = []spec{
 			str := func(k string) string { s, _ := m[k].(string); return s }
 			r.Code, r.Model, r.Serial, r.Firmware = str("code"), str("model"), str("serial"), str("firmware")
 			var lines []string
-			for _, p := range [][2]string{{"Code", r.Code}, {"Modell", r.Model}, {"Seriennummer", r.Serial}, {"Firmware", r.Firmware}} {
+			for _, p := range [][2]string{{tr(lang, "code"), r.Code}, {tr(lang, "model"), r.Model}, {tr(lang, "serial"), r.Serial}, {tr(lang, "firmware"), r.Firmware}} {
 				if p[1] != "" {
 					lines = append(lines, p[0]+" "+p[1])
 				}
 			}
-			return note{title: "🆕 Neuer Drucker wartet auf Freigabe", body: strings.Join(lines, "\n"), kind: "info"}, true
+			return note{title: "🆕 " + tr(lang, "new_printer"), body: strings.Join(lines, "\n"), kind: "info"}, true
 		}},
 	{key: "upload_failed", typ: "com.prusa.connect.device.transfer.settled", device: true,
-		build: func(d json.RawMessage, dev string, _ *settings, _ *app) (note, bool) {
+		build: func(d json.RawMessage, dev string, cfg *settings, _ *app) (note, bool) {
+			lang := cfg.lang()
 			var t struct {
 				State      string `json:"state"`
 				BytesSent  int64  `json:"bytes_sent"`
@@ -80,7 +82,7 @@ var specs = []spec{
 			if json.Unmarshal(d, &t) != nil || t.State == "done" || t.State == "" {
 				return note{}, false
 			}
-			word := map[string]string{"failed": "fehlgeschlagen", "cancelled": "abgebrochen", "interrupted": "unterbrochen"}[t.State]
+			word := map[string]string{"failed": tr(lang, "transfer_failed"), "cancelled": tr(lang, "transfer_cancel"), "interrupted": tr(lang, "transfer_interr")}[t.State]
 			if word == "" {
 				word = t.State
 			}
@@ -89,9 +91,9 @@ var specs = []spec{
 				lines = append(lines, t.Reason)
 			}
 			if t.BytesTotal > 0 {
-				lines = append(lines, fmt.Sprintf("%.1f von %.1f MB übertragen", float64(t.BytesSent)/1e6, float64(t.BytesTotal)/1e6))
+				lines = append(lines, fmt.Sprintf(tr(lang, "transferred"), float64(t.BytesSent)/1e6, float64(t.BytesTotal)/1e6))
 			}
-			return note{title: "📤 " + dev + ": Übertragung " + word, body: strings.Join(lines, "\n"), kind: "warning"}, true
+			return note{title: "📤 " + dev + ": " + fmt.Sprintf(tr(lang, "transfer"), word), body: strings.Join(lines, "\n"), kind: "warning"}, true
 		}},
 }
 
@@ -124,7 +126,8 @@ func specByType(t string) *spec {
 
 // buildIssues meldet nur, wenn sich die Liste der Probleme geändert hat und nicht leer ist: der Host sendet
 // bei jeder Änderung die ganze Liste.
-func buildIssues(d json.RawMessage, dev string, _ *settings, a *app) (note, bool) {
+func buildIssues(d json.RawMessage, dev string, cfg *settings, a *app) (note, bool) {
+	lang := cfg.lang()
 	var x struct {
 		Issues []struct {
 			Reason   string `json:"reason"`
@@ -157,7 +160,7 @@ func buildIssues(d json.RawMessage, dev string, _ *settings, a *app) (note, bool
 	}
 	if x.Dialog != nil && (x.Dialog.Title != "" || x.Dialog.Text != "") {
 		sig.WriteString("dialog|" + x.Dialog.Title)
-		lines = append(lines, "Am Gerät: "+strings.TrimSpace(x.Dialog.Title+" "+x.Dialog.Text))
+		lines = append(lines, tr(lang, "on_device")+strings.TrimSpace(x.Dialog.Title+" "+x.Dialog.Text))
 	}
 	if a.issueSig[dev] == sig.String() {
 		return note{}, false
@@ -166,5 +169,5 @@ func buildIssues(d json.RawMessage, dev string, _ *settings, a *app) (note, bool
 	if sig.Len() == 0 {
 		return note{}, false
 	}
-	return note{title: "⚠️ " + dev + ": Hinweis", body: strings.Join(lines, "\n"), kind: worst}, true
+	return note{title: "⚠️ " + dev + ": " + tr(lang, "issues"), body: strings.Join(lines, "\n"), kind: worst}, true
 }

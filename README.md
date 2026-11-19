@@ -14,7 +14,7 @@ A message for each of these events (you choose which ones):
 | `job_settled` | finished, failed, cancelled or unknown, with the file, the print time, the filament used and the end time |
 | `printer_online`, `printer_offline`, `printer_issues`, `new_printer`, `upload_failed` | optional, off by default |
 
-The text of the messages is German at the moment.
+The text of the messages is English by default. Set the option `language` to `de` for German.
 
 ## How it works
 
@@ -25,7 +25,7 @@ The module is a process the Connect Local server starts. It subscribes to the se
 From a release directory (module.yaml, the binary and checksums.txt):
 
 ```
-prusa-connect module add github.com/django1982/apprise-sink@0.4.2 -from <release directory> -approve
+prusa-connect module add github.com/django1982/apprise-sink@0.5.0 -from <release directory> -approve
 ```
 
 Then restart the server so that it reads the new record. In a container that is `docker exec <container> /prusa_connect_local module add ...` (the binary name may differ in your image) and `docker restart <container>`. Without `-approve` the module is installed switched off and the command prints what it asks for.
@@ -37,6 +37,7 @@ Then restart the server so that it reads the new record. In a container that is 
 | `apprise_url` | Full address of the Apprise notify endpoint, for example `http://apprise:8000/notify/KEY` |
 | `apprise_user`, `apprise_password` | HTTP basic authentication, empty for none. The password is a secret setting and is never logged |
 | `apprise_tag` | Apprise tag that selects the targets (comma means or, space means and). Empty sends to all |
+| `language` | Language of the notification texts: `en` (English, default) or `de` (German) |
 | `device_names` | Fallback names from device id to name, used only when the server cannot tell a name |
 | `events` | Which events to report (see above) |
 | `job_outcomes` | Which print results to report: `finished`, `failed`, `cancelled`, `unknown` |

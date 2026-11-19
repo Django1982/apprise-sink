@@ -32,11 +32,11 @@ type jobData struct {
 	FilamentKnown bool    `json:"filament_used_known"`
 }
 
-func deviceName(names map[string]string, id string) string {
+func deviceName(names map[string]string, id, lang string) string {
 	if n := names[id]; n != "" {
 		return n
 	}
-	return "Drucker"
+	return tr(lang, "printer")
 }
 
 func duration(s int64) string {
@@ -50,9 +50,13 @@ func duration(s int64) string {
 	}
 }
 
-func filament(mm float64) string {
+func filament(mm float64, lang string) string {
 	if mm >= 1000 {
-		return strings.Replace(fmt.Sprintf("%.2f m", mm/1000), ".", ",", 1)
+		v := fmt.Sprintf("%.2f m", mm/1000)
+		if lang == langDE {
+			v = strings.Replace(v, ".", ",", 1)
+		}
+		return v
 	}
 	return fmt.Sprintf("%.0f mm", mm)
 }
@@ -75,7 +79,7 @@ func fileName(d jobData) string {
 }
 
 // build macht aus einem Ereignis die Nachricht. ok ist false für Typen, die wir nicht melden.
-func build(eventType string, raw json.RawMessage, dev string) (note, bool) {
+func build(eventType string, raw json.RawMessage, dev, lang string) (note, bool) {
 	var d jobData
 	if err := json.Unmarshal(raw, &d); err != nil {
 		return note{}, false
@@ -90,35 +94,35 @@ func build(eventType string, raw json.RawMessage, dev string) (note, bool) {
 	switch eventType {
 	case "com.prusa.connect.device.job.started":
 		if t := clock(d.Started); t != "" {
-			add("Start " + t + " Uhr")
+			add(fmt.Sprintf(tr(lang, "started_at"), t))
 		}
-		return note{title: "🖨️ " + dev + ": Druck gestartet", body: strings.Join(lines, "\n"), kind: "info"}, true
+		return note{title: "🖨️ " + dev + ": " + tr(lang, "job_started"), body: strings.Join(lines, "\n"), kind: "info"}, true
 	case "com.prusa.connect.device.job.settled":
 		var title, kind string
 		switch d.Outcome {
 		case "finished":
-			title, kind = "✅ "+dev+": Druck fertig", "success"
+			title, kind = "✅ "+dev+": "+tr(lang, "job_finished"), "success"
 		case "failed":
-			title, kind = "❌ "+dev+": Druck fehlgeschlagen", "failure"
+			title, kind = "❌ "+dev+": "+tr(lang, "job_failed"), "failure"
 		case "cancelled":
-			title, kind = "⏹️ "+dev+": Druck abgebrochen", "warning"
+			title, kind = "⏹️ "+dev+": "+tr(lang, "job_cancelled"), "warning"
 		default:
-			title, kind = "❔ "+dev+": Druck beendet", "info"
+			title, kind = "❔ "+dev+": "+tr(lang, "job_ended"), "info"
 		}
 		if d.Outcome == "failed" || d.Outcome == "cancelled" {
-			add(fmt.Sprintf("Fortschritt %.0f %%", d.Progress))
+			add(fmt.Sprintf(tr(lang, "progress"), d.Progress))
 		}
 		if d.TimeKnown {
-			add("Dauer " + duration(d.TimePrintingS))
+			add(fmt.Sprintf(tr(lang, "duration"), duration(d.TimePrintingS)))
 		}
 		if d.FilamentKnown && d.FilamentMM > 0 {
-			add("Filament " + filament(d.FilamentMM))
+			add(fmt.Sprintf(tr(lang, "filament"), filament(d.FilamentMM, lang)))
 		}
 		if t := clock(d.Ended); t != "" {
-			add("Ende " + t + " Uhr")
+			add(fmt.Sprintf(tr(lang, "ended_at"), t))
 		}
 		if d.Outcome != "finished" && d.Outcome != "failed" && d.Outcome != "cancelled" && d.MachineState != "" {
-			add("Ergebnis unbekannt, das Gerät meldet " + d.MachineState)
+			add(fmt.Sprintf(tr(lang, "result_unknown"), d.MachineState))
 		}
 		return note{title: title, body: strings.Join(lines, "\n"), kind: kind}, true
 	}

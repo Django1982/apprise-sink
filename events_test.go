@@ -24,8 +24,13 @@ func TestSpecs(t *testing.T) {
 	if _, ok := up(json.RawMessage(`{"state":"done"}`), "p", cfg, a); ok {
 		t.Error("done wird nicht gemeldet")
 	}
-	if n, ok := up(json.RawMessage(`{"state":"failed","bytes_sent":1000000,"bytes_total":4000000,"reason":"Timeout"}`), "p", cfg, a); !ok || n.title != "📤 p: Übertragung fehlgeschlagen" || n.body != "Timeout\n1.0 von 4.0 MB übertragen" {
-		t.Errorf("upload: %q %q", n.title, n.body)
+	failed := json.RawMessage(`{"state":"failed","bytes_sent":1000000,"bytes_total":4000000,"reason":"Timeout"}`)
+	if n, ok := up(failed, "p", cfg, a); !ok || n.title != "📤 p: transfer failed" || n.body != "Timeout\n1.0 of 4.0 MB transferred" {
+		t.Errorf("upload en: %q %q", n.title, n.body)
+	}
+	de := &settings{Language: "de"}
+	if n, ok := up(failed, "p", de, a); !ok || n.title != "📤 p: Übertragung fehlgeschlagen" || n.body != "Timeout\n1.0 von 4.0 MB übertragen" {
+		t.Errorf("upload de: %q %q", n.title, n.body)
 	}
 	iss := specByKey("printer_issues").build
 	d := json.RawMessage(`{"issues":[{"reason":"filament_runout","severity":"warning","detail":"Spule leer"}]}`)
@@ -38,8 +43,18 @@ func TestSpecs(t *testing.T) {
 	if _, ok := iss(json.RawMessage(`{"issues":[]}`), "p", cfg, a); ok {
 		t.Error("leere Liste meldet nichts")
 	}
-	if n, ok := specByKey("new_printer").build(json.RawMessage(`{"code":"ABCD-1234","model":"COREONEL"}`), "", cfg, a); !ok || n.body != "Code ABCD-1234\nModell COREONEL" {
-		t.Errorf("new_printer: %q", n.body)
+	if n, ok := specByKey("new_printer").build(json.RawMessage(`{"code":"ABCD-1234","model":"COREONEL"}`), "", cfg, a); !ok || n.body != "Code ABCD-1234\nModel COREONEL" {
+		t.Errorf("new_printer en: %q", n.body)
+	}
+	if n, ok := specByKey("new_printer").build(json.RawMessage(`{"code":"ABCD-1234","model":"COREONEL"}`), "", de, a); !ok || n.body != "Code ABCD-1234\nModell COREONEL" {
+		t.Errorf("new_printer de: %q", n.body)
+	}
+	for _, c := range []struct {
+		key, title string
+	}{{"printer_online", "🟢 p: connected"}, {"printer_offline", "🔴 p: disconnected"}} {
+		if n, ok := specByKey(c.key).build(json.RawMessage(`{}`), "p", cfg, a); !ok || n.title != c.title {
+			t.Errorf("%s: %q", c.key, n.title)
+		}
 	}
 }
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0 - 2026-11-19
+- New option `language`: the notification texts are now English by default; `de` switches back to German. Suggested by the Prusa marketplace review.
+- **Behaviour change:** installations that relied on the German texts must set `language` to `de`.
+
 ## 0.4.2 - 2026-11-18
 - Fix: a time in UTC (for example the end of a print, `...Z`) is now shown in local time. Before, the message said 11:30 for 12:30.
 - `module.yaml`: `license: MIT` and `egress` added (the Connect Local beta.1 refuses a manifest without a licence).
